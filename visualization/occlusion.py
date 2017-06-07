@@ -13,7 +13,7 @@
 # note        : many copies of the input image are made;
 #               each is scored according to the
 #               classifier/model originally used
-#               (thus salience is relative)
+#               (thus salience is what the model finds salient)
 
 # dependencies: Pillow (or PIL)
 #               numpy
@@ -38,7 +38,7 @@ blendalph    = .8;      # alpha parameter for blending
 occlen       = 64;      # length of side of square occlusion
 stride       = 48;      # small => many calls; big => less precision;
 heatmapScale = 80;      # scales salience map matrix values before overlaying
-filepath     = "data/sample/10_left.jpeg"; # relative to this script's dir
+filepath     = "../data/sample/10_left.jpeg"; # relative to this script's dir
 
 ################################################################
 #                                                              #
@@ -50,7 +50,7 @@ filepath     = "data/sample/10_left.jpeg"; # relative to this script's dir
 # obtain the score for occluded image
 #######################################
 def getScore(occludedImage):
-    return 1;# model output here
+    return # model output here
 
 #######################################
 # obtain occlusions for source image
