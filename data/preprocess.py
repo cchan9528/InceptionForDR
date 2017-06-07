@@ -54,30 +54,30 @@ def partitionData(datadir="samples", t_classSamples=2000, v_classSamples=800):
     '''Move data from samples to training/validation directories'''
 
     # Determine if samples per class are possible
-    img_classes = numpy.load('labels_as_numpy_array.npy')
-    neededInClass = t_classSamples + v_classSamples
+    img_class = numpy.load('labels_as_numpy_array.npy')
+    needed = t_classSamples + v_classSamples
+    all_samples = next(os.walk(datadir))[2]
+    class_samples = []
     for i in range(5):
-        if( len( numpy.where( img_classes==str(i) )[0] ) < neededInClass):
-            print("not enough data for class " + str(i))
-            print("nothing was moved; please add more data for mentioned class")
-            return -1
+        class_masterlist = img_class[ numpy.where( img_class == str(i) )[0], 0 ]
+        exist_samples = [img for img in class_masterlist if img in all_samples]
+        class_samples.append(exist_samples);
+
+    # Report
+    flag = 0
+    for i in range(5):
+        print("class"+str(i)+":"+str(len(class_samples[i]))+"/"+str(needed))
+        if( len( class_samples[i] ) < needed): flag = 1;
+    if flag: print("nothing was moved; add more data classes"); return -1;
 
     # Move samples into class folders
     for classlabel in range(5):
-        # Get all files within class
-        filenames = [];
-        rows = numpy.where( img_classes == str(classlabel) )[0]
-        for row in rows:
-            filenames.append( img_classes[ row, 0 ] )
+        filenames = class_samples[classlabel];
+        for i in range(needed):
+            sampleDir = "validation/" if ( i>=t_classSamples )  else "training/"
+            os.rename(datadir + "/" + filenames[i],
+                      sampleDir + str(classlabel) + "/" + filenames[i])
 
-        # Move the file into data type/class folder
-        for i in range(neededInClass):
-            if(i<t_classSamples):
-                os.rename(datadir + "/" + filenames[i],
-                          "training/" + str(classlabel) + "/" + filenames[i])
-            else:
-                os.rename(datadir + "/" + filenames[i],
-                          "validation/" + str(classlabel) + "/" + filenames[i])
 
 def addFiletypeExtension(labelfile, ext):
 
