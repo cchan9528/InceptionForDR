@@ -21,9 +21,9 @@ def replaceData():
         tfiles = next(os.walk("training/" + str(i)))[2]
         vfiles = next(os.walk("validation/" + str(i)))[2]
         for tfile in tfiles:
-            os.rename("training/"+str(i)+"/"+tfile, "samples/"+tfile)
+            os.rename("training/"+str(i)+"/"+tfile, "extra/"+tfile)
         for vfile in vfiles:
-            os.rename("validation/"+str(i)+"/"+vfile, "samples/"+vfile)
+            os.rename("validation/"+str(i)+"/"+vfile, "extra/"+vfile)
 
 if __name__ == "__main__":
     replaceData();

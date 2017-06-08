@@ -15,7 +15,54 @@
 ################################################################
 import sys, glob, os, numpy
 from os import path as path
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+from keras.preprocessing.image import ImageDataGenerator
+
+def generateSamples(datadir='training'):
+
+    ''' Generate 500 samples from those in the training directory '''
+
+    # @Report
+    old = [0, 0, 0, 0, 0]
+    for i in range(5):
+        old[i] += len(os.listdir(datadir + '/' + str(i)))
+
+    # Configure the generator
+    sampleGenerator = ImageDataGenerator( rotation_range = 40,
+                                          width_shift_range=0.2,
+                                          height_shift_range=0.2,
+                                          shear_range=0.2,
+                                          zoom_range=0.2,
+                                          horizontal_flip=True,
+                                          fill_mode='nearest' )
+    newBatch = sampleGenerator.flow_from_directory( directory = datadir,
+                                                    batch_size = 1,
+                                                    shuffle = False,
+                                                    save_to_dir = 'extra',
+                                                    save_prefix = 'gen' )
+
+    # Create (batch_size * (stop-1)) samples
+    stop = 6
+    fns = newBatch.filenames
+    for batch in newBatch :
+        if newBatch.batch_index==stop:
+            break
+        targetPath, ext  = fns[newBatch.batch_index - 1].split('.')
+        targetPath += '_' + str(newBatch.batch_index) + '.' + ext
+
+        # Move the file
+        for fname in os.listdir('extra'):
+            if 'gen' in fname:
+                os.rename('extra/' + fname, datadir + '/' +targetPath)
+
+    # Report
+    new = [0, 0, 0, 0, 0]
+    for i in range(5):
+        new[i] += len(os.listdir(datadir + '/' + str(i)))
+    print("Num files in \'" + datadir + '\' classes 0, 1, 2, 3, 4')
+    print("Before: " + str(old))
+    print("After: " + str(new))
 
 def resizeData(datadir, outputdir="resized/", size=(150,150)):
     # Create directory if needed
@@ -49,7 +96,7 @@ def getLabels(labelfile, outputfile='labels_as_numpy_array.npy'):
 
     print("Your labels are in " + outputfile + " as numpy arrays")
 
-def partitionData(datadir="samples", t_classSamples=2000, v_classSamples=800):
+def partitionData(datadir="extra", t_classSamples=2000, v_classSamples=800):
 
     '''Move data from samples to training/validation directories'''
 
@@ -78,6 +125,7 @@ def partitionData(datadir="samples", t_classSamples=2000, v_classSamples=800):
             os.rename(datadir + "/" + filenames[i],
                       sampleDir + str(classlabel) + "/" + filenames[i])
 
+    print("Partitioning complete")
 
 def addFiletypeExtension(labelfile, ext):
 

@@ -52,7 +52,7 @@ def bottleneckTransform(t_dir = '../data/training',
     datagetter = ImageDataGenerator(rescale = 1.0 / 255)
 
     # Transform training data
-    numT = len([i for i in t_dir+'/'+os.listdir( os.listdir(t_dir)[0] ) ])
+    numT = len([i for i in os.listdir( t_dir+'/'+os.listdir(t_dir)[0] ) ])
     trainGetter = datagetter.flow_from_directory( t_dir,
                                                   target_size = (150, 150),
                                                   batch_size  = batchSize,
@@ -64,7 +64,7 @@ def bottleneckTransform(t_dir = '../data/training',
     numpy.save('fc_training_data.npy', transformed_tData)
 
     # Transfrom validation data
-    numV = len([i for i in v_dir+'/'+os.listrdir( os.listdir(v_dir)[0] ) ])
+    numV = len([i for i in os.listrdir( v_dir+'/'+os.listdir(v_dir)[0] ) ])
     validGetter = datagetter.flow_from_directory( v_dir,
                                                   target_size = (150, 150),
                                                   batch_size  = batchSize,
@@ -100,9 +100,9 @@ def trainFCLayer( numpy_tData   = 'fc_training_data.npy',
     fcModel.add( Flatten( inputshape = tData.shape[1:]) )
     fcModel.add( Dense(256, activation='relu') )
     fcModel.add( Dropout(0.5) )
-    fcModel.add( Dense(1, activation='sigmoid') )
+    fcModel.add( Dense(3, activation='sigmoid') )
     fcModel.compile( optimizer = 'rmsprop',
-                     loss      = 'binary_crossentropy',
+                     loss      = 'categorical_crossentropy',
                      metrics   = ['accuracy'])
 
     # Train FC model
