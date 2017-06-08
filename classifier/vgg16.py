@@ -52,7 +52,8 @@ def bottleneckTransform(t_dir = '../data/training',
     datagetter = ImageDataGenerator(rescale = 1.0 / 255)
 
     # Transform training data
-    numT = len([i for i in os.listdir( t_dir+'/'+os.listdir(t_dir)[0] ) ])
+    numT = len([i for i in os.listdir( t_dir+'/'+os.listdir(t_dir)[0] ) ]) * 5
+    print(numT)
     trainGetter = datagetter.flow_from_directory( t_dir,
                                                   target_size = (150, 150),
                                                   batch_size  = batchSize,
@@ -64,7 +65,8 @@ def bottleneckTransform(t_dir = '../data/training',
     numpy.save('fc_training_data.npy', transformed_tData)
 
     # Transfrom validation data
-    numV = len([i for i in os.listrdir( v_dir+'/'+os.listdir(v_dir)[0] ) ])
+    numV = len([i for i in os.listdir( v_dir+'/'+os.listdir(v_dir)[0] ) ]) * 5
+    print(numV)
     validGetter = datagetter.flow_from_directory( v_dir,
                                                   target_size = (150, 150),
                                                   batch_size  = batchSize,
@@ -78,12 +80,12 @@ def bottleneckTransform(t_dir = '../data/training',
 
     print("Transformed data into bottleneck features.")
 
-def trainFCLayer( numpy_tData   = 'fc_training_data.npy',
-                  numpy_vData   = 'fc_validation_data.npy',
-                  numpy_tLabels = 'fc_training_labels.npy',
-                  numpy_vLabels = 'fc_validation_labels.npy',
-                  numEpochs     = 50,
-                  batchSize     = 16 ):
+def trainFCLayer( t_classAmt,
+                  v_classAmt,
+                  numpy_tData = 'fc_training_data.npy',
+                  numpy_vData = 'fc_validation_data.npy',
+                  numEpochs   = 50,
+                  batchSize   = 16 ):
 
     '''Train a fully-connected (FC) network for new data classes'''
 
@@ -91,26 +93,42 @@ def trainFCLayer( numpy_tData   = 'fc_training_data.npy',
     tData = numpy.load(numpy_tData)
     vData = numpy.load(numpy_vData)
 
-    # Load labels
-    tLabels = numpy.load(numpy_tLabels)
-    vLabels = numpy.load(numpy_vLabels)
+    # Load labels as one-hot
+    arr_tLabels = numpy.array([0]*t_classAmt+\
+                              [1]*t_classAmt+\
+                              [2]*t_classAmt+\
+                              [3]*t_classAmt+\
+                              [4]*t_classAmt)
+    arr_vLabels = numpy.array([0]*v_classAmt+\
+                              [1]*v_classAmt+\
+                              [2]*v_classAmt+\
+                              [3]*v_classAmt+\
+                              [4]*v_classAmt)
+    onehot_tLabels = numpy.zeros( (5 * t_classAmt , 5) )
+    onehot_tLabels[numpy.arange( 5 * t_classAmt ), arr_tLabels] = 1
+    onehot_vLabels = numpy.zeros( (5 * v_classAmt , 5) )
+    onehot_vLabels[numpy.arange( 5 * v_classAmt ), arr_vLabels] = 1
 
     # Build FC model to place on top of the convolutional layers
     fcModel = Sequential()
-    fcModel.add( Flatten( inputshape = tData.shape[1:]) )
+    fcModel.add( Flatten( input_shape = tData.shape[1:]) )
+    print(fcModel.output_shape)
     fcModel.add( Dense(256, activation='relu') )
+    print(fcModel.output_shape)
     fcModel.add( Dropout(0.5) )
-    fcModel.add( Dense(3, activation='sigmoid') )
+    print(fcModel.output_shape)
+    fcModel.add( Dense(5, activation='sigmoid') )
+    print(fcModel.output_shape)
     fcModel.compile( optimizer = 'rmsprop',
                      loss      = 'categorical_crossentropy',
                      metrics   = ['accuracy'])
 
     # Train FC model
     fcModel.fit( tData,
-                 tLabels,
+                 onehot_tLabels,
                  epochs          = numEpochs,
                  batch_size      = batchSize,
-                 validation_data = (vData, vLabels) )
+                 validation_data = (vData, onehot_vLabels) )
 
     # Save final weights to classify new data; we now have the new model
     fcModel.save_weights('final_weights.h5')

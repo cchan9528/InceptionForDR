@@ -19,14 +19,21 @@ from PIL import Image, ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from keras.preprocessing.image import ImageDataGenerator
 
-def generateSamples(datadir='training'):
+def directoryReport(datadir):
+    label = [0, 0, 0, 0, 0]
+    for i in range(5):
+        label[i] = len(os.listdir(datadir + '/' + str(i)))
+    print("Num files in \'" + datadir + '\' classes 0, 1, 2, 3, 4')
+    print(str(label) + " => " + str(sum(label)) + " total files")
 
-    ''' Generate 500 samples from those in the training directory '''
+def generateSamples(total, datadir='training'):
+
+    ''' Generate and insert samples based on contents of datadir '''
 
     # @Report
     old = [0, 0, 0, 0, 0]
     for i in range(5):
-        old[i] += len(os.listdir(datadir + '/' + str(i)))
+        old[i] = len(os.listdir(datadir + '/' + str(i)))
 
     # Configure the generator
     sampleGenerator = ImageDataGenerator( rotation_range = 40,
@@ -36,33 +43,37 @@ def generateSamples(datadir='training'):
                                           zoom_range=0.2,
                                           horizontal_flip=True,
                                           fill_mode='nearest' )
-    newBatch = sampleGenerator.flow_from_directory( directory = datadir,
-                                                    batch_size = 1,
-                                                    shuffle = False,
-                                                    save_to_dir = 'extra',
-                                                    save_prefix = 'gen' )
+    batch = sampleGenerator.flow_from_directory( directory = datadir,
+                                                 batch_size = 1, # KEEP @ 1
+                                                 shuffle = False,
+                                                 save_to_dir = 'extra',
+                                                 save_prefix = 'gen' )
 
-    # Create (batch_size * (stop-1)) samples
-    stop = 6
-    fns = newBatch.filenames
-    for batch in newBatch :
-        if newBatch.batch_index==stop:
-            break
-        targetPath, ext  = fns[newBatch.batch_index - 1].split('.')
-        targetPath += '_' + str(newBatch.batch_index) + '.' + ext
+    # Create (batch_size * (total)) samples
+    fns = batch.filenames
+    numsources = len(fns)
+    while total != 0:
+        canProcess = total if total <= numsources else numsources
+        for i in range(canProcess):
+            # Create (batch_size) new sample and extract target path (class)
+            next(batch)
+            targetPath, ext  = fns[batch.batch_index].split('.')
+            targetPath += '_' + str(total) + '.' + ext
 
-        # Move the file
-        for fname in os.listdir('extra'):
-            if 'gen' in fname:
-                os.rename('extra/' + fname, datadir + '/' +targetPath)
+            # Move the file; inefficient but couldn't get filename from batch
+            for fname in os.listdir('extra'):
+                if 'gen' in fname:
+                    os.rename('extra/' + fname, datadir + '/' +targetPath)
+            total -= 1
 
     # Report
     new = [0, 0, 0, 0, 0]
     for i in range(5):
-        new[i] += len(os.listdir(datadir + '/' + str(i)))
+        new[i] = len(os.listdir(datadir + '/' + str(i)))
     print("Num files in \'" + datadir + '\' classes 0, 1, 2, 3, 4')
-    print("Before: " + str(old))
-    print("After: " + str(new))
+    print("Before: " + str(old) + " => " + str(sum(old)) + " total files")
+    print("After: " + str(new) + " => " + str(sum(new)) + " total files")
+    print(str(sum(new)-sum(old)) + " new files in \'" + datadir + '\'')
 
 def resizeData(datadir, outputdir="resized/", size=(150,150)):
     # Create directory if needed
