@@ -41,34 +41,36 @@ from keras.preprocessing.image import ImageDataGenerator
 ################################################################
 def bottleneckTransform(t_dir = '../data/training',
                         v_dir = '../data/validation',
-                        batchSize = 16):
+                        batchSize = 10):
 
-    '''Save convolutional layers output as input for new FC network (VGG16)'''
+    '''Save convolutional layers output of VGG16 as input for new end layers'''
 
-    # Instantiate a VGG16 CNN
-    model = applications.VGG16(include_top=False, weights='imagenet')
+    inputShape = (150, 150, 3) # keras.backend.image_data_format() for channels
+
+    # Instantiate a VGG16 CNN w/o End Layer
+    model = applications.VGG16(include_top=False,
+                               weights='imagenet',
+                               input_shape=inputShape)
 
     # Instantiate an image retriever
     datagetter = ImageDataGenerator(rescale = 1.0 / 255)
 
     # Transform training data
     numT = len([i for i in os.listdir( t_dir+'/'+os.listdir(t_dir)[0] ) ]) * 5
-    print(numT)
     trainGetter = datagetter.flow_from_directory( t_dir,
-                                                  target_size = (150, 150),
+                                                  target_size = inputShape[:2],
                                                   batch_size  = batchSize,
                                                   class_mode  = None,
                                                   shuffle     = False )
 
     transformed_tData = model.predict_generator(trainGetter, numT//batchSize)
 
-    numpy.save('fc_training_data.npy', transformed_tData)
+    numpy.save('vgg16_fc_training_data.npy', transformed_tData)
 
     # Transfrom validation data
     numV = len([i for i in os.listdir( v_dir+'/'+os.listdir(v_dir)[0] ) ]) * 5
-    print(numV)
     validGetter = datagetter.flow_from_directory( v_dir,
-                                                  target_size = (150, 150),
+                                                  target_size = inputShape[:2],
                                                   batch_size  = batchSize,
                                                   class_mode  = None,
                                                   shuffle     = False )
@@ -76,16 +78,17 @@ def bottleneckTransform(t_dir = '../data/training',
 
     transformed_vData = model.predict_generator(validGetter, numV//batchSize)
 
-    numpy.save('fc_validation_data.npy', transformed_vData)
+    numpy.save('vgg16_fc_validation_data.npy', transformed_vData)
 
-    print("Transformed data into bottleneck features.")
+    print("Transformed data into bottleneck features using VGG16.")
+    return (numT//5, numV//5)
 
 def trainFCLayer( t_classAmt,
                   v_classAmt,
-                  numpy_tData = 'fc_training_data.npy',
-                  numpy_vData = 'fc_validation_data.npy',
-                  numEpochs   = 50,
-                  batchSize   = 16 ):
+                  numpy_tData = 'vgg16_fc_training_data.npy',
+                  numpy_vData = 'vgg16_fc_validation_data.npy',
+                  numEpochs   = 30,
+                  batchSize   = 10 ):
 
     '''Train a fully-connected (FC) network for new data classes'''
 
@@ -112,13 +115,9 @@ def trainFCLayer( t_classAmt,
     # Build FC model to place on top of the convolutional layers
     fcModel = Sequential()
     fcModel.add( Flatten( input_shape = tData.shape[1:]) )
-    print(fcModel.output_shape)
     fcModel.add( Dense(256, activation='relu') )
-    print(fcModel.output_shape)
     fcModel.add( Dropout(0.5) )
-    print(fcModel.output_shape)
-    fcModel.add( Dense(5, activation='sigmoid') )
-    print(fcModel.output_shape)
+    fcModel.add( Dense(5, activation='softmax') )
     fcModel.compile( optimizer = 'rmsprop',
                      loss      = 'categorical_crossentropy',
                      metrics   = ['accuracy'])
@@ -131,10 +130,11 @@ def trainFCLayer( t_classAmt,
                  validation_data = (vData, onehot_vLabels) )
 
     # Save final weights to classify new data; we now have the new model
-    fcModel.save_weights('final_weights.h5')
+    fcModel.save_weights('vgg16_final_weights.h5')
 
-    print("New parameters acquired. Classification ready.")
+    print("New parameters acquired with VGG16.")
+    print("Classification ready.")
 
 if __name__=="__main__":
-    bottleneckTransform()
-    trainFCLayer()
+    t_classAmt, v_classAmt = bottleneckTransform()
+    trainFCLayer(t_classAmt, v_classAmt)

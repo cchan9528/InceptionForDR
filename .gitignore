@@ -1,4 +1,8 @@
-classifier/untitled.py
+classifier/fc*
+classifier/vgg16_*
+classifier/inceptionv3_*
+classifier/final_weights.h5
+classifier/__pycache__
 data/extra
 data/training
 data/validation

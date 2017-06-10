@@ -25,10 +25,11 @@ def directoryReport(datadir):
         label[i] = len(os.listdir(datadir + '/' + str(i)))
     print("Num files in \'" + datadir + '\' classes 0, 1, 2, 3, 4')
     print(str(label) + " => " + str(sum(label)) + " total files")
+    return label
 
-def generateSamples(total, datadir='training'):
+def generateClassSamples(total, datadir='training'):
 
-    ''' Generate and insert samples based on contents of datadir '''
+    ''' Generate and insert 'total' new samples for each class'''
 
     # @Report
     old = [0, 0, 0, 0, 0]
@@ -46,25 +47,26 @@ def generateSamples(total, datadir='training'):
     batch = sampleGenerator.flow_from_directory( directory = datadir,
                                                  batch_size = 1, # KEEP @ 1
                                                  shuffle = False,
-                                                 save_to_dir = 'extra',
-                                                 save_prefix = 'gen' )
+                                                 save_to_dir='extra/generated')
 
-    # Create (batch_size * (total)) samples
+    # Create (total * 5) number of new samples
     fns = batch.filenames
+    print(fns)
     numsources = len(fns)
-    while total != 0:
-        canProcess = total if total <= numsources else numsources
-        for i in range(canProcess):
-            # Create (batch_size) new sample and extract target path (class)
-            next(batch)
-            targetPath, ext  = fns[batch.batch_index].split('.')
-            targetPath += '_' + str(total) + '.' + ext
-
-            # Move the file; inefficient but couldn't get filename from batch
-            for fname in os.listdir('extra'):
-                if 'gen' in fname:
-                    os.rename('extra/' + fname, datadir + '/' +targetPath)
-            total -= 1
+    needed = [total] * 5
+    remaining = sum(needed)
+    while remaining != 0:
+        next(batch)
+        targetPath, ext = fns[batch.batch_index-1].strip().split('.')
+        thisClass = int(targetPath.split('/')[0])
+        if needed[thisClass] == 0:
+            continue
+        targetPath += '_' + str(remaining) + '.' + ext
+        for fname in os.listdir('extra/generated'):
+            os.rename('extra/generated/' + fname, datadir + '/' + targetPath)
+        needed[thisClass] -= 1
+        remaining -=1
+        print("Total Remaining: " + str(remaining))
 
     # Report
     new = [0, 0, 0, 0, 0]
@@ -107,34 +109,37 @@ def getLabels(labelfile, outputfile='labels_as_numpy_array.npy'):
 
     print("Your labels are in " + outputfile + " as numpy arrays")
 
-def partitionData(datadir="extra", t_classSamples=2000, v_classSamples=800):
+def partitionClasses(datadir="extra"):
+
+    '''Categorize all data by class'''
+
+    img_class = numpy.load('labels_as_numpy_array.npy')
+    all_samples = next(os.walk(datadir))[2]
+    for sample in all_samples:
+        label = img_class[ (numpy.where(img_class == sample))[0] ][0][1]
+        print(datadir+'/'+sample+" --> "+datadir+'/'+label+'/'+sample)
+        os.rename(datadir+'/'+sample, datadir+'/'+label+'/'+sample)
+    directoryReport(datadir)
+
+def partitionTV(datadir="extra", t_classSamples=2000, v_classSamples=800):
 
     '''Move data from samples to training/validation directories'''
 
     # Determine if samples per class are possible
-    img_class = numpy.load('labels_as_numpy_array.npy')
+    numExistPerClass = directoryReport(datadir)
     needed = t_classSamples + v_classSamples
-    all_samples = next(os.walk(datadir))[2]
-    class_samples = []
-    for i in range(5):
-        class_masterlist = img_class[ numpy.where( img_class == str(i) )[0], 0 ]
-        exist_samples = [img for img in class_masterlist if img in all_samples]
-        class_samples.append(exist_samples);
-
-    # Report
-    flag = 0
-    for i in range(5):
-        print("class"+str(i)+":"+str(len(class_samples[i]))+"/"+str(needed))
-        if( len( class_samples[i] ) < needed): flag = 1;
-    if flag: print("nothing was moved; add more data classes"); return -1;
+    for i in numExistPerClass:
+        if i < needed:
+            print("nothing was moved; add more data classes"); return -1;
 
     # Move samples into class folders
     for classlabel in range(5):
-        filenames = class_samples[classlabel];
+        extra_class_samples = datadir + '/' + str(classlabel)
+        filenames = os.listdir(extra_class_samples);
         for i in range(needed):
-            sampleDir = "validation/" if ( i>=t_classSamples )  else "training/"
-            os.rename(datadir + "/" + filenames[i],
-                      sampleDir + str(classlabel) + "/" + filenames[i])
+            targetDir = "validation/" if ( i>=t_classSamples )  else "training/"
+            os.rename(extra_class_samples + "/" + filenames[i],
+                      targetDir + str(classlabel) + "/" + filenames[i])
 
     print("Partitioning complete")
 
