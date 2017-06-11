@@ -113,11 +113,12 @@ def trainFCLayer( t_classAmt,
     onehot_vLabels[numpy.arange( 5 * v_classAmt ), arr_vLabels] = 1
 
     # Build FC model to place on top of the convolutional layers
-    fcModel = Sequential()
-    fcModel.add( Flatten( input_shape = tData.shape[1:]) )
-    fcModel.add( Dense(256, activation='relu') )
-    fcModel.add( Dropout(0.5) )
-    fcModel.add( Dense(5, activation='softmax') )
+    fcModel = Sequential([
+        Flatten( input_shape = tData.shape[1:]),
+        Dense(256, activation='relu'),
+        Dropout(0.5),
+        Dense(5, activation='softmax'),
+    ])
     fcModel.compile( optimizer = 'rmsprop',
                      loss      = 'categorical_crossentropy',
                      metrics   = ['accuracy'])
@@ -130,7 +131,7 @@ def trainFCLayer( t_classAmt,
                  validation_data = (vData, onehot_vLabels) )
 
     # Save final weights to classify new data; we now have the new model
-    fcModel.save_weights('vgg16_final_weights.h5')
+    fcModel.save('vgg16_dr_model.h5')
 
     print("New parameters acquired with VGG16.")
     print("Classification ready.")

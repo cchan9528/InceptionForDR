@@ -130,7 +130,7 @@ def trainFCLayer( t_classAmt,
                  validation_data = (vData, onehot_vLabels) )
 
     # Save final weights to classify new data; we now have the new model
-    fcModel.save_weights('inceptionv3_final_weights.h5')
+    fcModel.save('inceptionv3_dr_model.h5')
 
     print("New parameters acquired from IncpetionV3 bottlenecks.")
     print("Classification ready.")
