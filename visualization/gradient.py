@@ -14,25 +14,53 @@
 #                                                              #
 ################################################################
 
-import sys, numpy, keras.models, tensorflow
+import sys
+from keras import models
+import tensorflow as tf
+import keras.backend as K
 import matplotlib.pyplot as matplot
+from PIL import Image, ImageFont, ImageDraw
+import numpy as np
 
 input_images = [
-    "./../data/validation/0/1024_left.jpeg",
-    "./../data/validation/1/1266_left.jpeg",
-    "./../data/validation/2/1111_left.jpeg",
-    "./../data/validation/3/16624_right.jpeg",
-    "./../data/validation/4/18819_left.jpeg"
+    "/data/DR/inceptionDR/modelPerfRecords/inceptionMini3-classAll.v8a/epoch8/imageLinks/0/0/3795_right.jpg",
+    "/data/DR/inceptionDR/modelPerfRecords/inceptionMini3-classAll.v8a/epoch8/imageLinks/1/1/2495_right.jpg",
+    "/data/DR/inceptionDR/modelPerfRecords/inceptionMini3-classAll.v8a/epoch8/imageLinks/2/2/42247_left.jpg",
+    "/data/DR/inceptionDR/modelPerfRecords/inceptionMini3-classAll.v8a/epoch8/imageLinks/3/3/3868_left.jpg",
+    "/data/DR/inceptionDR/modelPerfRecords/inceptionMini3-classAll.v8a/epoch8/imageLinks/4/4/3563_left.jpg",
+
+    '/home/joseph/Desktop/td/0/10407_right.jpg',
+    '/home/joseph/Desktop/td/4/13811_right.jpg'
+
 ]
 
-chanels= 3
-rows = 150
-cols = 150
+channels= 3
+rows = 800
+cols = 800
 
-blendalpha = .8
+blendalpha = .2
 
+imaI = 3
 ################################################################
 #                                                              #
+#                         helper                               #
+#                                                              #
+################################################################
+def getImgArray(path):
+    src = Image.open(path).resize([rows, cols]);
+    x = np.expand_dims(src, axis=0)
+    return x
+
+# Credit to Shoyer
+# https://github.com/tensorflow/tensorflow/issues/675
+def jacobian(y, x):
+  y_flat = tf.reshape(y, (-1,))
+  jacobian_flat = tf.stack(
+      [tf.gradients(y_i, x)[0] for y_i in tf.unstack(y_flat)])
+  return tf.reshape(jacobian_flat, y.shape.concatenate(x.shape))
+
+################################################################
+#                                                               #
 #                         runner                               #
 #                                                              #
 ################################################################
@@ -41,50 +69,35 @@ if __name__ == "__main__":
 
     ''' Load a model, find it's gradient matrix at input, visualize salience '''
 
-    if len(sys.argv) != 2:
-        sys.exit("Error: \n Usage: python gradient.py [modelfile]")
 
     # Load the model
-    model = keras.models.load_model(sys.argv[1])
+    model = models.load_model('/data/DR/inceptionDR/matureModels/modelIncepMini3-0.74.h5')
 
-    # Get gradient matrices
-
-    # option 1:
-    X = tensorflow.placeholder(shape=(None,4,4,512))
+    # Define the input (X), outputs(Y), gradient matrix (jacobian J)
+    X_in = getImgArray(input_images[imaI])
+    X = tf.placeholder(tf.float32, shape=(1,rows,cols,channels))
     Y = model(X)
-    jacobian = tensorflow.gradients(model.output, X)
-    jacobian /= K.sqrt(K.mean(K.square(jacobian)))*1e-2
-    findJacobian = K.function([X, K.learning_phase()], [jacobian])
-    findY = K.function([X], print(K.get_session().run(Y)))
-    # if model.input is the original image
-    j = findJacobian([input_image_as_numpy_array[0:1], 0])
-    # if model.input is the flattened/transformed version of image like bottleneck
-    # findJacobian([samples[0:1], 0])
+    J = jacobian(Y,X)
 
-    # option 2:
-    # weights   = model.trainable_weights
-    # gradients = model.optimizer.get_gradients(model.model.total_loss, weights)
-    # gradient_at_input = gradients[0]
+    # Evaluate the Jacobian (rows are class gradients)
+    sess = K.get_session()
+    class_gradients = sess.run(J, feed_dict={X:X_in, K.learning_phase(): 1})
+    class_gradients = class_gradients.reshape((5, rows, cols, channels))
 
     # Rearrange the gradient matrix at the input to match the input image shape
-        # NOTE: Assuming we have gradient NxM, n=number of pixels, M=number of weights in next layer?
     class_gradient = []
-    for jacobianRow in j:
-        class_gradient.append(jacobianRow.reshape((channels,rows,cols)))
+    for row in class_gradients:
+        class_gradient.append(row.reshape((rows,cols,channels)))
 
-    # For each pixel, select max across all color chanmnels as the salience value
-        # NOTE: Assuming channels first! (numpy.shape returns channels first)
-    # salienceMap = numpy.zeros(single_channel_input_shape)
-    # if len(input_shape.shape) == 3:
-    #     for pixel, garbage in numpy.ndenumerate(pixels[0,:,:]):
-    #         row = pixel[0]; col = pixel[1];
-    #         salienceMap[row,col] = max(numpy.absolute(pixels[:, row, col]))
-    # else:
-    #     for row_col, value in numpy.ndenumerate(pixels):
-    #         salienceMap[row_col[0], row_col[1]] = abs(value)
+    # For each pixel, get max across all color chanmnels as the salience value
+    oriImage = Image.open(input_images[imaI]).resize([rows, cols])
+    oriImage.putalpha(100);
     for i, g in enumerate(class_gradient):
-        salience = (numpy.amax(numpy.absolute(g), axis=0)).flatten()
+        salience = (np.amax(np.absolute(g), axis=2))
+        salience /= 5
         colormap = matplot.get_cmap('jet')
-        coloredSalience = Image.fromarray(numpy.uint8(colormap(salience)*255))
-        salienceMap = Image.blend(input_images[i], coloredSalience, blendalpha)
-        salienceMap.show()
+        cp = colormap(salience)
+        coloredSalience = Image.fromarray(np.uint8(cp*255))
+        salienceMap = Image.blend(oriImage, coloredSalience, blendalpha)
+        salienceMap.save('visImages/salGrad'+str(i)+'.jpg')
+        salienceMap.show(title='salGrad'+str(i))
